@@ -1,3 +1,3 @@
-keyloop.exe: keyloop.asm
-	tasm keyloop
-	tlink keyloop
+lockstep.exe: lockstep.asm
+	tasm lockstep
+	tlink lockstep

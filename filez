@@ -1,3 +1,8 @@
 15-Dec-2022:
    keyloop - disable irq0 and irq1, poll for keypress and print char, q to quit
 
+16-Dec-2022:
+   dma - set DMA refresh to occur every 76 PIT pulses
+
+21-Dec-2022:
+   lockstep - get CPU within 1 cycle (3 hdots) of lockstep with CRTC
