@@ -6,3 +6,23 @@
 
 21-Dec-2022:
    lockstep - get CPU within 1 cycle (3 hdots) of lockstep with CRTC
+
+22-Dec-2022:
+   keyloop - basic CRT loop which checks for a key each iteration
+             if a key is pressed everything restarts
+             at the top of the loop the background colour is changed briefly
+             there is a delay (delay1) between the loop top and keyboard check
+             there is a delay (delay2) between the keyboard check and loop top
+             there is a delay (delay3) before the first iteration of the loop
+             keys are as follows:
+                W = delay1 += 1
+                E = delay2 -= 1
+                R = delay1 += 4
+                T = delay2 -= 4
+                Y = delay3 += 1
+                U = delay3 += 4
+             Basically W,E move the keyboard handler to the right one cycle
+                       R,T move the keyboard handler to the right four cycles
+                       Y moves the background register write to the right one cycle
+                       U moves the background register write to the right four cycles
+
