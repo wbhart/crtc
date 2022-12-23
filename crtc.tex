@@ -92,8 +92,8 @@ memory for display and also DRAM refresh (which cannot be disabled, even in the
 blanking region).
 
 At boot time the CGA card and PIT start with a random phase with respect to
-one another. As the PIT is run with a cycle of 12 hdots and the CRTC hchar is
-8 hdots the best we can do is lockstep of the CRTC and PIT within 4 hdots,
+one another. As the PIT is run with a cycle of 12 hdots and the CRTC lchar is
+16 hdots the best we can do is lockstep of the CRTC and PIT within 4 hdots,
 meaning there is an unknown phase of 0-3 hdots between the two, which can only
 be changed on reboot.
 
@@ -102,7 +102,7 @@ refresh is run on timer 1. DRAM refresh can be slowed or sped up from its
 standard value of 18 PIT cycles (each scanline in standard modes 76 PIT
 cycles exactly), or temporarily turned off.
 
-As the CPU clock is every 3 hdots and the 6845 hchar takes 8 hdots and these
+As the CPU clock is every 3 hdots and the 6845 lchar takes 16 hdots and these
 are relatively prime, it is possible to align these. In practice this is done
 by a series of delays and VRAM accesses and then waiting for a particular
 lchar in a CRTC frame. This puts the CRTC and CPU into lockstep (a consistent
