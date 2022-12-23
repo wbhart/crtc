@@ -236,7 +236,8 @@ however remains to be confirmed.
 \subsection{Is there any edge case behaviour?}
 
 If horiz. disp. is set greater than or equal to horiz. total $+1$ the final
-character of the scanline is only half displayed. The second hchar is blank.
+character of the scanline is only half displayed; the second hchar of that
+final lchar is blank.
 
 This is probably a general behaviour of this CRTC (the final hchar before
 the end of the scanline is blanked).
