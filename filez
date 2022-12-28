@@ -29,15 +29,26 @@
                    going outside the range will result in unpredicatable results
                    press keys for incrementing by 4 for larger jumps
 
-22-Dec-2022:
-   hordisp - code for experimenting with changing the horiz. disp. reg. from 40 to some value
-             keys are as above with the following additions:
-                I = switch from setting bg reg to setting horiz disp reg
-                O = increment value of horiz. disp. reg. (starts at 0)
-                P = delay3 -= 1
-                [ = delay3 -= 4
-                ] = switch from setting horiz disp reg to setting bg reg
-             Note: keys that decrement by 1 do so in limited range, usually 0-6 or so
-                   going outside the range will result in unpredicatable results
-                   press keys for decrementing by 4 for larger jumps
-
+28-Dec-2022:
+   hordisp - code for experimenting with changing the hdisp. reg.
+             the code changes the hdisp reg. from an initial value to another
+             value and then back again later in the frame
+             the exact position of the write is shown by a red bar which starts
+             at the very beginning of the frame but can be moved about down to
+             the hdot
+             the write occurs in the hdot immediately following the red bar
+             keys are as follows:
+                q = quit program
+                e = move down one scanline
+                t = increment the initial value of hdisp (starts at 0)
+                y = move right by one hdot
+                u = move right by 4 cycles = 12 hdots
+                i = switch to graphical mode to see result
+                o = increment the value hdisp is changed to (also starts at 0)
+                p = move left by 1 hdot
+                [ = move left by 4 cycles = 12 hdots
+                ] = switch back to grid mode
+             the following keys are also available but the program must be modified
+             to make effective use of them
+                w = pad main loop by 1 cycle
+                r = pad main loop by 4 cycles

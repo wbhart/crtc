@@ -48,15 +48,16 @@ The HD6845 is commonly used as the CRT Controller (CRTC) in IBM CGA cards and
 whilst its documented behaviour is well-known, there are many questions
 remaining about how it operates.
 
-Exploitation of ``glitches'' in the CRTC can lead to interesting effect used
-in demos such as 8088MPH and Area 5150.
+Exploitation of ``glitches'' in the CRTC can lead to interesting effects used
+in demos such as 8088MPH and Area5150.
 
 Many of the internals of the 6845 can be guessed by examining the behaviour of
 the chip in a cycle exact way.
 
 We can infer that registers Rx have a corresponding internal counter Cx which
 is compared with the value in Rx by some comparator. Actions may occur when
-the comparator goes high and when it goes low.
+the comparator goes high when Cx reaches the register value Rx and when it
+goes low after reaching Rx$+1$.
 
 We know such internal counters must exist, otherwise the values in the
 registers would be lost during operation.
@@ -66,7 +67,7 @@ double values or that internal counters are incremented by 2, etc.
 
 \section{Notation}
 
-We use the terminology as standardised in the blog of Reenigne.
+We use the terminology more or less as standardised in the blog of Reenigne.
 
 \begin{enumerate}
 \item hdot $=$ time for one pixel in hires mode (640 horizontal pixels)
@@ -76,7 +77,7 @@ We use the terminology as standardised in the blog of Reenigne.
 \item lchar $= 16$ hdots $=$ one character in 40-column mode
 \end{enumerate}
 
-\section{Lockstep limitations}
+\section{Lockstep}
 
 There are four things that can operate with a relative phase to one another:
 the CPU, the Programmable Interval Timer (PIT), the CGA card, the CRTC.
@@ -88,42 +89,174 @@ Note that the CRTC derives its input from the CGA card, so these are by
 definition in sync. Also, the CGA card timing is relevant because of the wait
 states it asserts on the bus if the CPU tries to access VRAM. This is to avoid
 conflict with the CGA card accessing VRAM as it continually strobes through CGA
-memory for display and also DRAM refresh (which cannot be disabled, even in the
-blanking region).
+memory for display and also VRAM refresh (which cannot be fully disabled, even
+in the blanking region).
 
 At boot time the CGA card and PIT start with a random phase with respect to
 one another. As the PIT is run with a cycle of 12 hdots and the CRTC lchar is
 16 hdots the best we can do is lockstep of the CRTC and PIT within 4 hdots,
 meaning there is an unknown phase of 0-3 hdots between the two, which can only
-be changed on reboot.
+be changed (randomly) on reboot.
 
 This is relevant even if the PIT is not used as a system timer, as system DRAM
 refresh is run on timer 1. DRAM refresh can be slowed or sped up from its
-standard value of 18 PIT cycles (each scanline in standard modes 76 PIT
+standard value of 18 PIT cycles (each scanline in standard modes is 76 PIT
 cycles exactly), or temporarily turned off.
 
 As the CPU clock is every 3 hdots and the 6845 lchar takes 16 hdots and these
-are relatively prime, it is possible to align these. In practice this is done
-by a series of delays and VRAM accesses and then waiting for a particular
-lchar in a CRTC frame. This puts the CRTC and CPU into lockstep (a consistent
-phase with respect to one another, though at any given time one doesn't know
-what this phase actually is).
+are relatively prime, it is possible to align these.
 
-A full CRT frame (262 scanlines of 57 lchars) is a precise number of CPU cycles
-and exactly 19912 PIT cycles. Of course most monitors have some tolerance and
-we are referring here to the CRT frame as set up in IBM BIOS modes.
+A full CRT frame (262 scanlines of 57 lchars as defined by the IBM BIOS) is
+precisely 79648 CPU cycles and exactly 19912 PIT cycles so once aligned, in
+the absence of external interference, these will remain aligned in standard
+modes.
 
-Reenigne has developed code for lockstep to the maximum possible degree modulo
-the unalterable phase between the CGA card and CRTC.
+This process of alignment is called \emph{lockstep} by Reenigne (a consistent
+phase of the CRTC and CPU with respect to one another). Reenigne's method
+of obtaining lockstep consists of a series of delays and VRAM accesses (causing
+a sequence of wait states that reduces the number of possible phases at each
+step).
 
-Subject to the system timer not being used and DRAM refresh being off or only
-occuring when there is no other bus activity, this lockstep can be made cycle
-accurate.
+Reenigne discovered this method by analysing the wait state algorithm of the
+IBM CGA card although some experimentation was apparently required to find a
+sequence that worked in practice.
 
-We also make use of a partial lockstep in this document which consists of the
-second part of Reenigne's lockstep, followed by an additional section to bring
-things within one CPU cycle of lockstep, meaning that there is a consistent
-phase of 0-2 hdots which is not determined.
+Once lockstep is achieved, any fixed sequence of code, CGA register writes
+(other than certain mode changes), CRTC register writes (other than those
+which change the size of the CRT frame), DRAM writes and so long as there is
+no reboot, PIT pulses, will result in precisely the same result down to the
+hdot. If the PIT is not used (including for DRAM refresh) then the results
+will be the same even after reboot.
+
+Of course interrupts from external devices such as the keyboard, disk drives
+and so on, may cause a loss of lockstep, so these are usually switched off.
+The keyboard can be polled by checking the IRR and accessing the keyboard
+buffer directly via a port. Lockstep can also be lost by changing the screen
+geometry of course.
+
+Unfortunately the IBM CGA card used for the experiments in this document
+did not respond correctly to Reenigne's lockstep sequence (we have not yet
+determined the reason). Therefore we use a slightly different approach.
+
+As per the last part of Reenigne's method, we set up a CRTC frame of two
+characters by two scanlines in CGA graphics mode so that there are 4 lchars
+per frame. We set horizontal displayed and vertical displayed to 1 so that
+there is exactly one lchar in the active region.
+
+We first use Reenigne's loop of exactly 144 cycles which is exactly 27
+lchars to step through lchars until we reach the active lchar. At this point
+there are exactly 16 phases (one for each hdot of the lchar). We then waste
+some cycles until we are just back into the lchar immediately following the
+active lchar. We then use a loop of precisely 85 CPU cycles which is 255
+hdots, or one hdot less than a multiple of 4 lchars. This allows us to step
+back to the active lchar one hdot at a time until it is again detected. At
+this point we are in full lockstep.
+
+The lockstep algorithm we use appears to be reliable. The display enable
+signal appears to be consistent down to the hdot, though obviously we don't
+know about any delays due to internal circuitry. By the time the CPU knows
+about the display enable signal, some time may have passed. But at least this
+delay is absolutely consistent, to the hdot (modulo hardware defect).
+
+Note that there are three possible hdot phases of the first hdot of the
+active region in a standard mode with respect to the CPU cycle that occurs at
+that time (0, 1 or 2 hdots).
+
+If investigating phenomena that occur at some random character on the screen
+then we can investigate all cycle phases by simply moving our experiments
+between three consecutive lchars, as one lchar is 16 hdots and one CPU cycle
+is 3 hdots. Thus changing the character by one also changes the phase by one.
+
+Unfortunately, as the number of lchars in a scanline is a multiple of 3, any
+phenomena that occur at the start or end of a scanline (including the start
+of the active region) can only be investigated in all three phases by changing
+the phase for the entire frame. This can be achieved by adding a 0, 1 or 2
+hdot delay in the lockstep routine. In practice this means adding delays of
+$64n + 21$ cycles while the CRTC is still doing 4 lchars per frame, for
+example.
+
+\section{Limitations}
+
+In order to determine what time various register writes take effect, and the
+precise time hdot marginal behaviour is exhibited, there are three methods that
+could be used.
+
+\begin{itemize}
+\item Assume the CRTC is a black box and analyse any delays in the CGA card
+and system board schematics
+\item Assume the CRTC is a black box and instrument the system with a sniffer
+\item Determine timings from their visual effect
+\end{itemize}
+
+In this document we have decided to take the third approach. However, in order
+to do so, there must be some reference event that is visible that we can
+compare everything to.
+
+As CGA background register writes take effect down to the hdot (visible using
+an RGB2HDMI adaptor with a large LCD monitor) and probably take effect with
+very little delay, we decided to give all timings with respect to when a
+background register change causes a visible change onscreen.
+
+To this end, the precise hdot where the colour change becomes visible for the
+first time is taken to be the time that the background colour register change
+took effect. Of course this subsumes a constant delay due to internal CGA
+circuitry which is unknown.
+
+To write a CRTC register takes one byte to be sent to port 3D4H to specify the
+CRTC register and another byte to be sent to port 3D5H to specify the value.
+Obviously the register value cannot change until the second byte is received,
+and again we don't know about any internal delays.
+
+It's conceivable that the delay depends on which bits are changed or on whether
+the value is being changed \emph{to} a value that corresponds to a character
+position about to be encountered imminently or \emph{from} such a value. We
+refer to the latter as a \emph{to-imminent} or \emph{from-imminent} changes,
+respectively.
+
+Each write of a byte to a port takes 4-5 lchars or more (depending on at least
+the state of the CPU prefetch, bus activity and whether it has been idle,
+interrupts and possibily other things). Thus a write of both bytes to change a
+CRTC register is a relatively slow process.
+
+In light of unknown constant delays associated with both background register
+writes and CRTC register writes we cannot talk in absolute terms about when
+these took place. However, we can talk about when one occurs relative to the
+other.
+
+To this end we first do \emph{two} background register changes (each of which
+can be done with a write of a single byte to a CGA port), e.g. we change the
+background colour to red on the first write and then back to black on the
+second write. We then use exactly the same code, but change the two background
+register writes to a single CRTC register write (recall this takes two bytes to
+be written to ports).
+
+There are no wait states associated with any of these writes on the IBM PC,
+therefore from the CPU's perspective the code will take precisely the same
+number of cycles in both cases when this exchange is made in the code.
+
+Obviously we are interested in when the CRTC register change takes effect,
+and we \emph{define} it to have been written when the second background colour
+change was visible onscreen (which we will have previously determined before
+the code was switched).
+
+What we are interested in is when a CRTC register value has to be written (as
+measured in the way just specified) in order for it to take effect, or to
+exhibit some glitch or other marginal behaviour.
+
+In this way we aren't really measuring when such register writes take effect
+because of the unknown internal delays, but we have a relative reference point
+with which to compare.
+
+This method can't tell us anything about any constant internal delays, but it
+can conceivably tell us about any delays that depend on which bits are changed
+or on whether a to-imminent or from-imminent change is being made.
+
+Obviously if instrumentation or circuit analysis or simulation subsequently
+reveal something about absolute delays associated with a background register
+write then we can use the relative information recorded in this document to
+say something in absolute terms about when the CRTC register writes actually
+take effect. However, from the programmer's perspective this information isn't
+needed to be useful.
 
 \section{The Horizontal Displayed Register}
 
@@ -143,95 +276,122 @@ scanline, but many questions remain.
 
 \subsection{Methodology}
 
-The program HORDISP.ASM does the following to get a partial lockstep:
+The program HDISP1.ASM does the following to achieve lockstep:
 
 \begin{enumerate}
 \item Enter CGA graphics mode (equivalent of BIOS mode 4)
 \item Set up a CRTC frame with 2 scanlines of 2 lchars, with one lchar in the active region
 \item With a cycle exact loop of 144 cycles $= 4n-3$ lchars ($n = 7$) wait until in the active region
 \item Waste some cycles until back in the inactive region
-\item With a cycle exact loop of $4k$ lchars minus 1 cycle, wait until in the active region again
+\item With a cycle exact loop of 85 cycles, wait until in the active region again
 \end{enumerate}
 
-This puts the CPU in a known state with respect to the CRTC, within 1 cycle (3
-hdots) every time.
+This puts the CPU in a known state with respect to the CRTC down to the hdot.
+As far as we can tell, this is entirely consistent between runs if DRAM refresh
+is disabled.
+
+In order to handle DRAM refresh the program executes 256 consecutive bytes of
+code in each 64kb block of system RAM, repeated four times per CRT frame. This
+causes those 256 bytes to be read approximately every 4ms.
+
+The 256 bytes per 64kb block are alternated between offset 0 and offset 256.
+The reason for this is that on the XT 4164 and 41256 DRAM chips are typically
+used. The 4164's require refresh every 4ms, or roughly four times per CRT
+frame. The 4164's are 64kbits and the 41256's are 256kb. The former will be
+refreshed if reads are done on 256 rows (corresponding to the low 8 address
+bits) and the latter require reads on 512 rows (corresponding to the low 9
+address bits).
+
+The alternating behaviour of the reads from offset 0 to offset 256 ensures
+that even for the 41256 chips, all 512 rows are energised.
+
+To execute code in all 64kb blocks, small segments of 256 bytes in each block
+are saved by our program and overwritten by NOPs and a RETF. These are replaced
+before returning to DOS.
+
+Note that this method does not work on early PCs, as these used 16kbit 4116
+chips which need refreshing every 2ms. As there are so many of them in a 640kb
+system, there isn't time in a CRT frame to refresh them all.
 
 The program turns off the keyboard and timer interrupts (the only ones firing
 on a quiet XT) and polls the IRR to see if a keyboard IRQ has occurred. If this
 is detected, the entire program restarts, usually modifying some program values
-before doing so, in response to the keypress.
+before doing so, in response to the keypress. Lockstep is re-run on every
+restart to ensure consistent behaviour between runs.
 
-The main loop can be adjusted to the precise number of cycles for a standard
-CGA CRT frame and DRAM refresh is set to 38 PIT cycles to localise interference
-to the same two positions on each scanline.
+The main loop can be adjusted to a precise number of cycles and defaults to the
+exact number of cycles for a standard CGA CRTC frame.
 
-The keyboard polling is also done at a consistent time about half way down the
-frame and its position can be adjusted in a cycle accurate way.
+The code for changing background colour/CRTC registers and for polling the
+keyboard is interleaved with the refresh code so that there is no interference
+between DRAM refresh and these other operations.
+
+The register writes always happen at the top of the main loop, however their
+exact position relative to the CRTC frame down to the CPU cycle can be changed
+by altering a delay after lockstep and before the start of the main loop.
 
 Longrunning instructions such as SHL (with a high count) and MUL are used for
-timing within 4 and 1 cycles respectively. These instructions have no bus
-access associated with them, except for instruction prefetch. The code is
-written so that as many instruction prefetches as practicable occur at the same
-relative place on a scanline to minimise interference from system DRAM refresh.
+timing within 4 and 1 cycles respectively.
 
-The program allows setting the horiz. disp. reg. at any time to within about 1
-cycle. Often simply restarting by pressing a key causes a different phase (0-2
-hdots) at the point the register is being written, due to the imperfect
-lockstep, allowing easy exploration of all three behaviours.
+The program can be made to switch from background register writes to a
+horizontal displayed (hdisp) register write and back again. When doing
+background register writes the program displays pixels on every second scanline
+starting with the first, with alternating on/off pixels, starting with the
+first on each scanline. This allows the background colour changes to be
+observed when on an odd scanline (numbered from 0) and measured against the
+coloured pixels in the neighbouring even scanlines.
 
-The program has two modes, one which sets the background register of the CGA
-to put a short piece of red background on a scanline at two places on the
-screen. The first pixel after this red mark is taken to be the point at which
-this register write took place.
+Different coloured pixels are used in each lchar in a repeating pattern.
 
-This can then be swapped for code that writes a CRTC register instead (the
-horiz. disp. reg.) at precisely the same point (by using the same code just
-with different values for the register port address and value).
+When doing CRTC register writes all pixels on the screen are filled (again
+repeating a pattern to delineate the lchars) except for every tenth scanline
+which is left black. The latter is done to make it easier to see when the
+CRTC has stopped updating the VRAM address at the end of each scanline.
 
-This allows one to visually control almost down to the pixel (really to
-within 1 CPU cycle) where the CRTC register write happens.
-
-Once approximate information is gained in this way, we may write a program that
-uses full lockstep and precise timing to get information down to the hdot.
+Counting is done on a large LCD monitor after conversion using an RGB2HDMI
+adaptor, which makes every hdot visible.
 
 \subsection{When does the horiz. disp. reg. value take effect?}
 
-We do not know precisely when the background colour change occurs relative
-to when the register is written, and there is a similar ambiguity for the
-CRTC register write. Therefore all we can really report without instrumentation
-is when the CRTC register write \emph{appears} to take place as determined by
-the visual change that a similar background register write causes when done at
-precisely the same time in the loop (modulo the cycle uncertainty - the program
-restarts when switching from a background register write to a CRTC register
-write).
-
-We see three behaviours which can be described as follows:
+For a to-imminent change from a higher hdisp value we see three behaviours:
 
 \begin{enumerate}
-\item The horiz. disp. value ($n$) takes full effect, blanking all but the
+\item The new hdisp value ($n$) takes full effect, blanking all but the
 first $n$ characters
-\item The horiz. disp. value does not take effect, causing all characters
-to be displayed right out to horiz. total $+1$ characters, with the exception
+\item An intermediate behaviour where the new hdisp value only takes effect
+from the second half of the lchar where it is supposed to start blanking, leaving
+an extra hchar displayed before blanking the remainder of the scanline
+\item The hdisp value does not take effect, causing all characters to be
+displayed right out to horiz. total $+1$ characters, with the exception
 of the final character which only displays the first hchar of the full lchar,
 the right hand hchar being blank
-\item An intermediate behaviour where the horiz. disp. value only takes effect
-from the second half of the lchar where it is supposed to start blanking, leaving
-an extra hchar displayed
 \end{enumerate}
 
-As far as can be determined using HORDISP.ASM, the dividing line between the
-three behaviours occurs when the register write occurs on the second last pixel
-of character $n - 1$ (numbered from $0$) where $n$ is the value being written
-into the horiz. disp. reg., i.e. the second last pixel before it is supposed
-to take effect.
+These behaviours occur when the write happens on the fourth last, third last or
+second last hdot before the imminent character, respectively.
 
-The precise hdot and for how many hdots (1 or 2) that the intermediate
-behaviour occurs is only known approximately.
+A to-imminent change to a strictly greater value has no visible effect on the
+current scanline, as we are already blanking at that point, so it continues to
+do so. However, there is a revealing behaviour.
 
-Given that all three behaviours can be exibited within the same cycle it is
-likely that there is only one hdot exhibiting the intermediate behaviour
-and experiments suggest this could be the third last hdot of the lchar. This
-however remains to be confirmed.
+So long as the higher value is written to the register strictly before the
+second last hdot of the higher hdisp is reached, the address will be updated to
+the higher value, even though characters have not been displayed since the lower
+hdisp value was reached.
+
+This behaviour occurs so long as the higher value is written to the register
+strictly after the fifth hdot before the lower value is reached.
+
+As might be expected, a from-imminent change to a higher hdisp value results in
+no unusual behaviour (other than the address incrementing behaviour just
+described).
+
+A from-imminent change to a lower hdisp value causes the third behaviour in the
+list above if the change is made early enough (strictly before the 8th hdot of
+the character). As the hdisp value is never reached in this case the address is
+not updated.
+
+
 
 \subsection{Is there any edge case behaviour?}
 
@@ -248,19 +408,43 @@ Unknown.
 
 \subsection{What triggers when the comparator goes high/low?}
 
-Unknown.
+Address update seems to be triggered by the comparator going high (presumably)
+so long as this happens before horiz. total $+1$ characters are displayed
+(see below).
 
 \subsection{What happens if it is set multiple times in a scanline?}
 
-Unknown.
+The program HDISP2.ASM allows two updates to horiz. disp. to be made on the
+same scanline. Both values can be set independently.
+
+All behaviour appears to be in line with the following:
+
+\begin{itemize}
+\item Whenever horiz. disp. is reached the address is updated.
+\item Reaching horiz. disp. the first time begins blanking and this just
+      continues the second time it is reached on a scanline
+\item If horiz. disp. is not reached for a first time the entire scanline is
+      filled (with the exception of the last hchar as usual), but the address
+      is not updated.
+\end{itemize}
 
 \subsection{What is its behaviour near other register values, such as horiz. sync.pos,
-      and horiz. total.}
+and horiz. total.}
 
-Unknown.
+See the other sections for behaviour near horiz. total.
+
+Behaviour near horiz. sync. pos. is not known.
 
 \subsection{When is the horiz. disp. value added to the address?}
 
-Unknown.
+If the horiz. disp. value is greater than horiz. total. the address is not
+updated.
+
+In the corner case where horiz. disp. $=$ horiz. total $+1$ this still holds,
+even though half of the final character is displayed. Of course horiz. disp.
+would only be reached on the next character.
+
+Otherwise the address appears to be updated whenever horiz. disp. is reached.
+
 
 \end{document}
