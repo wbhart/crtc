@@ -211,7 +211,7 @@ respectively.
 Each write of a byte to a port takes approximately 4-5 lchars including the time
 to load the port address and value into CPU registers (the precise number of
 cycles depends on at least the state of the CPU prefetch, bus activity and
-whether it has been idle, interrupts and possibly other things).Thus a write of
+whether it has been idle, interrupts and possibly other things). Thus a write of
 both bytes to change a CRTC register is a relatively slow process.
 
 In light of unknown constant delays associated with both background register
@@ -270,8 +270,8 @@ scanline, but many questions remain.
 \item What resets the count to zero?
 \item What triggers when the comparator goes high/low?
 \item What happens if it is set multiple times in a scanline?
-\item What is its behaviour near other register values, such as horiz. sync.pos,
-      and horiz. total.
+\item What is its behaviour near other register values, such as hsync pos,
+      and htotal?
 \item When is the horiz. disp. value added to the address?
 \end{enumerate}
 
@@ -331,8 +331,8 @@ The register writes always happen at the top of the main loop, however their
 exact position relative to the CRTC frame down to the hdot can be changed
 by altering a delay after lockstep and before the start of the main loop to
 adjust the cycle the loop starts on, and an additional delay of some multiple
-of 85 cycles after lockstep but before a normal CRTC frame size is reestablihed
-in order to control the hdot phase of 0-2 hdots.
+of 85 cycles after lockstep but before a normal CRTC frame size is
+reestablished in order to control the hdot phase of 0-2 hdots.
 
 Longrunning instructions such as SHL (with a high count) and MUL are used for
 timing within 4 and 1 cycles respectively.
@@ -365,7 +365,7 @@ first $n$ characters
 from the second half of the lchar where it is supposed to start blanking, leaving
 an extra hchar displayed before blanking the remainder of the scanline
 \item The hdisp value does not take effect, causing all characters to be
-displayed right out to horiz. total $+1$ characters, with the exception
+displayed right out to htotal$+1$ characters, with the exception
 of the final character which only displays the first hchar of the full lchar,
 the right hand hchar being blank
 \end{enumerate}
@@ -464,7 +464,7 @@ There appears to be no special behaviour when changing hdisp near hsync pos.
 
 \subsection{When is the hdisp value added to the address?}
 
-If the hdisp value is greater than htotal the address is not updated, otherwise
-it is updated on the last scanline of a row when hdisp is reached.
+If the hdisp value is strictly greater than htotal the address is not updated,
+otherwise it is updated on the last scanline of a row when hdisp is reached.
 
 \end{document}
