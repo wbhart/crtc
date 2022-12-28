@@ -54,16 +54,21 @@ in demos such as 8088MPH and Area5150.
 Many of the internals of the 6845 can be guessed by examining the behaviour of
 the chip in a cycle exact way.
 
-We can infer that registers Rx have a corresponding internal counter Cx which
-is compared with the value in Rx by some comparator. Actions may occur when
-the comparator goes high when Cx reaches the register value Rx and when it
-goes low after reaching Rx$+1$.
+We can infer that the chip consists of registers Rx and a set of internal
+counters Cy which are compared with the values in registers Rx by comparators.
+Actions may occur when the comparator goes high when some Cy reaches a register
+value Rx and when it goes low again after reaching Rx$+1$.
 
 We know such internal counters must exist, otherwise the values in the
 registers would be lost during operation.
 
 Of course the possibility remains that comparators compare with half or
 double values or that internal counters are incremented by 2, etc.
+
+Much of the internal construction can be inferred from block diagrams in the
+datasheet, from the fact that transistors were not wasted and from the fact
+the 6845 contained no circuitry for addition/subtraction, other than incrementing
+of the various internal counters.
 
 \section{Notation}
 
@@ -138,10 +143,10 @@ Unfortunately the IBM CGA card used for the experiments in this document
 did not respond correctly to Reenigne's lockstep sequence (we have not yet
 determined the reason). Therefore we use a slightly different approach.
 
-As per the last part of Reenigne's method, we set up a CRTC frame of two
-characters by two scanlines in CGA graphics mode so that there are 4 lchars
-per frame. We set horizontal displayed and vertical displayed to 1 so that
-there is exactly one lchar in the active region.
+Similarly to the last part of Reenigne's method, we set up a CRTC frame of
+four horizontal two characters by two scanlines in CGA graphics mode so that
+there are 8 lchars per frame. We set horizontal displayed and vertical
+displayed to 1 so that there is exactly one lchar in the active region.
 
 We first use Reenigne's loop of exactly 144 cycles which is exactly 27
 lchars to step through lchars until we reach the active lchar. At this point
@@ -162,18 +167,8 @@ Note that there are three possible hdot phases of the first hdot of the
 active region in a standard mode with respect to the CPU cycle that occurs at
 that time (0, 1 or 2 hdots).
 
-If investigating phenomena that occur at some random character on the screen
-then we can investigate all cycle phases by simply moving our experiments
-between three consecutive lchars, as one lchar is 16 hdots and one CPU cycle
-is 3 hdots. Thus changing the character by one also changes the phase by one.
-
-Unfortunately, as the number of lchars in a scanline is a multiple of 3, any
-phenomena that occur at the start or end of a scanline (including the start
-of the active region) can only be investigated in all three phases by changing
-the phase for the entire frame. This can be achieved by adding a 0, 1 or 2
-hdot delay in the lockstep routine. In practice this means adding delays of
-$64n + 21$ cycles while the CRTC is still doing 4 lchars per frame, for
-example.
+To precisely control the phase we again step a fixed number of times by 85
+cycles to get a phase of 0, 1 or 2 hdots as desired.
 
 \section{Limitations}
 
@@ -213,19 +208,25 @@ position about to be encountered imminently or \emph{from} such a value. We
 refer to the latter as a \emph{to-imminent} or \emph{from-imminent} changes,
 respectively.
 
-Each write of a byte to a port takes 4-5 lchars or more (depending on at least
-the state of the CPU prefetch, bus activity and whether it has been idle,
-interrupts and possibily other things). Thus a write of both bytes to change a
-CRTC register is a relatively slow process.
+Each write of a byte to a port takes approximately 4-5 lchars including the time
+to load the port address and value into CPU registers (the precise number of
+cycles depends on at least the state of the CPU prefetch, bus activity and
+whether it has been idle, interrupts and possibly other things).Thus a write of
+both bytes to change a CRTC register is a relatively slow process.
 
 In light of unknown constant delays associated with both background register
 writes and CRTC register writes we cannot talk in absolute terms about when
 these took place. However, we can talk about when one occurs relative to the
 other.
 
-To this end we first do \emph{two} background register changes (each of which
-can be done with a write of a single byte to a CGA port), e.g. we change the
-background colour to red on the first write and then back to black on the
+Obviously the relative delays will depend on model of video card, but the
+timings we give in this document are for one of the two IBM CGA cards which
+behave identical up to differences in the CRTC chip.
+
+In order to measure the relative timings of various effects that occur on a
+CRTC register write we first do \emph{two} background register changes (each of
+which can be done with a write of a single byte to a CGA port), e.g. we change
+the background colour to red on the first write and then back to black on the
 second write. We then use exactly the same code, but change the two background
 register writes to a single CRTC register write (recall this takes two bytes to
 be written to ports).
@@ -280,7 +281,7 @@ The program HDISP1.ASM does the following to achieve lockstep:
 
 \begin{enumerate}
 \item Enter CGA graphics mode (equivalent of BIOS mode 4)
-\item Set up a CRTC frame with 2 scanlines of 2 lchars, with one lchar in the active region
+\item Set up a CRTC frame with 2 scanlines of 4 lchars, with one lchar in the active region
 \item With a cycle exact loop of 144 cycles $= 4n-3$ lchars ($n = 7$) wait until in the active region
 \item Waste some cycles until back in the inactive region
 \item With a cycle exact loop of 85 cycles, wait until in the active region again
@@ -327,19 +328,21 @@ keyboard is interleaved with the refresh code so that there is no interference
 between DRAM refresh and these other operations.
 
 The register writes always happen at the top of the main loop, however their
-exact position relative to the CRTC frame down to the CPU cycle can be changed
-by altering a delay after lockstep and before the start of the main loop.
+exact position relative to the CRTC frame down to the hdot can be changed
+by altering a delay after lockstep and before the start of the main loop to
+adjust the cycle the loop starts on, and an additional delay of some multiple
+of 85 cycles after lockstep but before a normal CRTC frame size is reestablihed
+in order to control the hdot phase of 0-2 hdots.
 
 Longrunning instructions such as SHL (with a high count) and MUL are used for
 timing within 4 and 1 cycles respectively.
 
 The program can be made to switch from background register writes to a
 horizontal displayed (hdisp) register write and back again. When doing
-background register writes the program displays pixels on every second scanline
-starting with the first, with alternating on/off pixels, starting with the
-first on each scanline. This allows the background colour changes to be
-observed when on an odd scanline (numbered from 0) and measured against the
-coloured pixels in the neighbouring even scanlines.
+background register writes the program displays pixels on every second
+scanline, with alternating on/off pixels, starting with the first on each
+scanline. This allows the background colour changes to be observed when
+measured against the coloured pixels in the neighbouring scanlines.
 
 Different coloured pixels are used in each lchar in a repeating pattern.
 
@@ -375,76 +378,93 @@ current scanline, as we are already blanking at that point, so it continues to
 do so. However, there is a revealing behaviour.
 
 So long as the higher value is written to the register strictly before the
-second last hdot of the higher hdisp is reached, the address will be updated to
-the higher value, even though characters have not been displayed since the lower
-hdisp value was reached.
+second last hdot of the higher hdisp is reached (and we are on the last
+scanline of the character row), the address will be updated to the higher value,
+even though characters have not been displayed since the lower hdisp value was
+reached.
 
 This behaviour occurs so long as the higher value is written to the register
 strictly after the fifth hdot before the lower value is reached.
-
-As might be expected, a from-imminent change to a higher hdisp value results in
-no unusual behaviour (other than the address incrementing behaviour just
-described).
 
 A from-imminent change to a lower hdisp value causes the third behaviour in the
 list above if the change is made early enough (strictly before the 8th hdot of
 the character). As the hdisp value is never reached in this case the address is
 not updated.
 
+As might be expected, a from-imminent change to a higher hdisp value results in
+no unusual behaviour (other than the address incrementing behaviour just
+described). If the change is made in time the larger value for hdisp is used,
+otherwise the smaller value continues to be used.
 
+However, the cutoff between the two cases changes according to a very
+intriguing rule which we have verified in at least 3 HD6845 chips (and not in
+other CRTC chips).
+
+Generally, the larger value must be written strictly before the 8th hdot of the
+character before the smaller value is reached. However in very specific cases
+there is an extra one hdot delay meaning that the write must be done one hdot
+earlier to take effect.
+
+If we are making a from-imminent change of hdisp from $m$ to some $n > m$ then
+the extra hdot delay exists if all of the bits of $m$ which are set are also
+set in $n$, with the exception of bit $0$ which does not affect timings.
+
+Note that it doesn't make any difference if additional bits of $n$ are set. The
+only ones that affect the timing are those corresponding to bits set in $m$
+(with the exception of bit $0$ of course).
+
+We have not been able to speculate what causes this unusual timing behaviour,
+but it has been very carefully measured.
 
 \subsection{Is there any edge case behaviour?}
 
-If horiz. disp. is set greater than or equal to horiz. total $+1$ the final
-character of the scanline is only half displayed; the second hchar of that
-final lchar is blank.
+If hdisp is set strictly greater than htotal the final character of the
+scanline is only half displayed; the second hchar of that final lchar is blank.
 
 This is probably a general behaviour of this CRTC (the final hchar before
 the end of the scanline is blanked).
 
 \subsection{What resets the count to zero?}
 
-Unknown.
+Unknown, however a single internal counter is likely used for comparison
+against the hdisp, htotal and hsync pos registers, and this horizontal counter
+is needed for comparison against htotal, so we know the counter can't be reset
+before htotal is reached. It must be 0 by the time htotal$+1$ is reached as
+this is the start of the next scanline where hdisp may be $0$, so the counter
+must be $0$ by that point.
 
 \subsection{What triggers when the comparator goes high/low?}
 
 Address update seems to be triggered by the comparator going high (presumably)
-so long as this happens before horiz. total $+1$ characters are displayed
-(see below).
+so long as this happens before htotal$+1$ characters are displayed (see below).
 
 \subsection{What happens if it is set multiple times in a scanline?}
 
-The program HDISP2.ASM allows two updates to horiz. disp. to be made on the
-same scanline. Both values can be set independently.
+The program HDISP2.ASM allows two updates to hdisp to be made on the same
+scanline. Both values can be set independently.
 
 All behaviour appears to be in line with the following:
 
 \begin{itemize}
-\item Whenever horiz. disp. is reached the address is updated.
-\item Reaching horiz. disp. the first time begins blanking and this just
-      continues the second time it is reached on a scanline
-\item If horiz. disp. is not reached for a first time the entire scanline is
-      filled (with the exception of the last hchar as usual), but the address
-      is not updated.
+\item Whenever hdisp is reached on the last scanline of a row, the address is
+      updated.
+\item Reaching hdisp the first time begins blanking and this continues to the
+      end on the scanline regardless if hdisp is reached again or not
+\item If hdisp is not reached for a first time the entire scanline is filled
+      (with the exception of the last hchar as usual), but the address is not
+      updated
 \end{itemize}
 
-\subsection{What is its behaviour near other register values, such as horiz. sync.pos,
-and horiz. total.}
+\subsection{What is its behaviour near other register values, such as hsync pos,
+and htotal?}
 
-See the other sections for behaviour near horiz. total.
+See the other sections for behaviour near htotal.
 
-Behaviour near horiz. sync. pos. is not known.
+There appears to be no special behaviour when changing hdisp near hsync pos.
 
-\subsection{When is the horiz. disp. value added to the address?}
+\subsection{When is the hdisp value added to the address?}
 
-If the horiz. disp. value is greater than horiz. total. the address is not
-updated.
-
-In the corner case where horiz. disp. $=$ horiz. total $+1$ this still holds,
-even though half of the final character is displayed. Of course horiz. disp.
-would only be reached on the next character.
-
-Otherwise the address appears to be updated whenever horiz. disp. is reached.
-
+If the hdisp value is greater than htotal the address is not updated, otherwise
+it is updated on the last scanline of a row when hdisp is reached.
 
 \end{document}
