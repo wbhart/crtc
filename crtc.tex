@@ -435,8 +435,26 @@ must be $0$ by that point.
 
 \subsection{What triggers when the comparator goes high/low?}
 
-Address update seems to be triggered by the comparator going high (presumably)
-so long as this happens before htotal$+1$ characters are displayed (see below).
+Address update seems to be triggered by the hdisp comparator so long as hdisp
+is reached before the horizontal counter reaches htotal$+1$ characters (see
+below).
+
+Interestingly, if hdisp is not reached on the final scanline of the frame
+the address is not reset to the start address but continues to increment in the
+next frame.
+
+This is slightly surprising as one might have imagined that this had to happen
+at the end of the scanline on which the horizontal total adjust value is
+reached.
+
+The exact sequence of events that trigger address reset is not clear, but it
+seems likely that hdisp being reached is a component of it, just as it is for
+address update at other times.
+
+It's unlikely that it's simply the vertical total adjust counter reaching
+the vertical total adjust value as this value could be zero and the counter is
+likely only 5 bits meaning that it isn't counting all the time and is therefore
+likely zero at other times when hdisp is reached.
 
 \subsection{What happens if it is set multiple times in a scanline?}
 
@@ -508,7 +526,7 @@ compensate for the extra scanlines being used up in this region by adding
 
 \subsection{When does htotal take effect?}
 
-Without exception it seems that htotal can be set up 18 hdots before the
+Without exception it seems that htotal can be written up to 18 hdots before the
 scanline we want to have length htotal$+1$. However it does not need to be set
 before the scanline starts. So long as it is set strictly before 18 hdots ahead
 of the next scanline (both the existing one and the one we are setting up), it
@@ -522,13 +540,19 @@ wraparound. This very likely results in loss of sync.
 \subsection{Is there any anomalous behaviour?}
 
 If one sets htotal to a smaller value than hdisp for the last scanline of the
-frame, the address will not be reset to zero at the beginning of the next
-frame. This causes the address to keep cycling through VRAM even as we go from
-frame to frame, resulting in a kind of scrolling effect.
+frame, the address will not be reset to the start address at the beginning of
+the next frame. This causes the address to keep incrementing through VRAM even
+as we go from frame to frame.
 
 \subsection{What is triggered by the comparator going high?}
 
 Presumably the horizontal counter is reset to zero ready for the next scanline.
-Precisely when this happens hasn't been determined.
+
+Likewise it seems probable that the row address is incremented.
+
+It's unknown whether the horizontal sync counter could be reset at this time.
+
+Precisely when these events happen hasn't been determined, and we don't know
+if they occur when the comparator for htotal goes high or low.
 
 \end{document}
