@@ -467,4 +467,68 @@ There appears to be no special behaviour when changing hdisp near hsync pos.
 If the hdisp value is strictly greater than htotal the address is not updated,
 otherwise it is updated on the last scanline of a row when hdisp is reached.
 
+\section{The Horizontal Total Register}
+
+This controls the number of characters horizontally in the scanline. The actual
+number of characters is always one more than the value in the register. One
+can speculate that this is because there are tasks that the CRTC needs to do in
+the final character of each scanline and so the comparator needs to go high one
+character before the end of the scanline.
+
+There are a number of questions we'd like to answer about the horizontal total
+register.
+
+\begin{enumerate}
+\item When does htotal take effect?
+\item Is there any anomalous behaviour?
+\item What is triggered by the comparator going high?
+\end{enumerate}
+
+\subsection{Methodology}
+
+There are only so many values that we can easily set the horizontal total to.
+Typically a CRTC frame is 57 lchars wide. Monitors tend to tolerate values
+very close to this.
+
+One consideration is that if the number of characters in a scanline isn't
+divisible by 3 there will not be an whole number of CPU cycles in a frame
+unless the number of scanlines is divisible by 3. We can ensure this is the
+case by adjusting the vertical total adjust.
+
+The program HTOT1.ASM sets the width of the screen to 56 lchars and for three
+rasterlines sets the size of a scanline to 28 lchars. In order to compensate
+for three extra scanlines being used up in this region, we have to add an
+additional three scanlines to the vertical total adjust, as well as round it
+to a multiple of 3.
+
+The program HTOT2.ASM sets the width of the screen to 57 lchars and for three
+rasterlines sets the size of a scanline to 19 lchars. Once again we have to
+compensate for the extra scanlines being used up in this region by adding
+6 in this case to the vertical total adjust.
+
+\subsection{When does htotal take effect?}
+
+Without exception it seems that htotal can be set up 18 hdots before the
+scanline we want to have length htotal$+1$. However it does not need to be set
+before the scanline starts. So long as it is set strictly before 18 hdots ahead
+of the next scanline (both the existing one and the one we are setting up), it
+will still take effect.
+
+Setting htotal after this point will cause a wraparound of the horizontal
+counter (which counts to 255 before wrapping around to zero) and for the
+counter to keep going until it encounters the new htotal value after the
+wraparound. This very likely results in loss of sync.
+
+\subsection{Is there any anomalous behaviour?}
+
+If one sets htotal to a smaller value than hdisp for the last scanline of the
+frame, the address will not be reset to zero at the beginning of the next
+frame. This causes the address to keep cycling through VRAM even as we go from
+frame to frame, resulting in a kind of scrolling effect.
+
+\subsection{What is triggered by the comparator going high?}
+
+Presumably the horizontal counter is reset to zero ready for the next scanline.
+Precisely when this happens hasn't been determined.
+
 \end{document}
