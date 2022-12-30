@@ -435,26 +435,30 @@ must be $0$ by that point.
 
 \subsection{What triggers when the comparator goes high/low?}
 
-Address update seems to be triggered by the hdisp comparator so long as hdisp
-is reached before the horizontal counter reaches htotal$+1$ characters (see
-below).
+The address update for the start of a scanline (at least the active ones) seems
+to be triggered by the hdisp comparator. But this only happens if hdisp
+is reached before the horizontal counter reaches htotal$+1$ characters,
+otherwise the start of scanline address is not advanced (see below).
 
-Interestingly, if hdisp is not reached on the final scanline of the frame
-the address is not reset to the start address but continues to increment in the
-next frame.
+Interestingly, if hdisp is not reached on the final (active?) scanline of the
+frame the start of scanline address is not reset to the start address but
+continues to be increased in the next frame.
 
-This is slightly surprising as one might have imagined that this had to happen
+This is slightly surprising as one might have imagined that this happening
 at the end of the scanline on which the horizontal total adjust value is
 reached.
 
-The exact sequence of events that trigger address reset is not clear, but it
-seems likely that hdisp being reached is a component of it, just as it is for
-address update at other times.
+The exact sequence of events that trigger start of scanline address reset to
+the start address is not clear, but it seems likely that hdisp being reached is
+a component of it, just as it is for update at other times.
 
-It's unlikely that it's simply the vertical total adjust counter reaching
-the vertical total adjust value as this value could be zero and the counter is
-likely only 5 bits meaning that it isn't counting all the time and is therefore
-likely zero at other times when hdisp is reached.
+It's unlikely that it's triggered by the vertical total adjust counter reaching
+the vertical total adjust value as this value could be zero. The associated
+counter is likely only 5 bits meaning that it isn't counting all the time and is
+therefore probably zero throughout much of the frame.
+
+It is possible that the reset to start address happens at the end of the active
+region, but this remains to be confirmed.
 
 \subsection{What happens if it is set multiple times in a scanline?}
 
