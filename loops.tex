@@ -63,7 +63,7 @@ give precisely timed loops.
 
 All timings in this document assume interrupts do not occur (e.g. they are
 switched off), that DRAM refresh has been switched off and that no wait
-states will be incurred (e.g. by accessing VRAM)..
+states will be incurred (e.g. by accessing VRAM).
 
 The effect of DRAM refresh if it is switch on is hard to estimate. In general
 it is model specific, but on the original IBM PC/XT it ties up the bus for 4
@@ -102,11 +102,13 @@ cases can also be worked around by increasing the iteration count.
 
 We will examine the timings in cycles per iteration of a number of basic
 loops. There are two types of loop we will look at: ones that terminate after
-a fixed number of iterations and ones that terminate on some condition
+a specified number of iterations and ones that terminate on some condition
 dependent on a value read from a port (e.g. the PIT channel 2 read back or
-the CRTC display enable or vertical retrace signals.
+the CRTC display enable or vertical retrace signals).
 
-The first loop we will look at is the following. We will refer to it as Loop1.
+Let's begin with loops that terminate after a certain number of iterations.
+
+The first loop we will look at is the following.
 
 \begin{lstlisting}
    mov cx, 5
@@ -226,7 +228,7 @@ Adding a NOP to a loop will simply increase the number of cycles by 4 (albeit
 without additional registers or flags being clobbered).
 
 Unfortunately there are no other interesing single byte instructions with
-useful timings which are effectively an no operation.
+useful timings which are effectively a no operation.
 
 Two byte instructions are another story. One can add 18 cycles by adding an
 unconditional (short) jump to a label immediately following the jump
