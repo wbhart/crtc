@@ -1,3 +1,3 @@
-hordisp.exe: hordisp.asm
-	tasm hordisp
-	tlink hordisp
+htot3.exe: htot3.asm
+	tasm htot3
+	tlink htot3

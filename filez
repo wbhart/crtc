@@ -52,3 +52,21 @@
              to make effective use of them
                 w = pad main loop by 1 cycle
                 r = pad main loop by 4 cycles
+
+31-Dec-2022:
+   hdisp2 -  code for updating hdisp twice instead of once on the same scanline
+             this code is based on the defunct hordisp described above rather
+             than the greatly improved hdisp1 code
+
+   htot1 -   set up the display with htotal+1 = 55+1 initially and for 3
+             rasterlines change it to 27+1
+             controls are as for hdisp1 above except that t/o control htotal
+             instead (which causes loss of sync) and e cannot move by precisely
+             one scanline so doesn't even try to be precise
+
+   htot2 -   as for htot1 except that the display is set up initially with
+             htotal+1 = 56+1 and for 3 rasterlines is set to 18+1
+
+   htot3 -   as for htot1 except that the display is set up initially with
+             htotal+1 = 56+1 and for 2 rasterlines is set to 37+1
+
