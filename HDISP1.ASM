@@ -473,7 +473,7 @@ skip_inc1:
 
    cmp dl, 18    ; e = increment scanline
    jne skip_inc1a
-   inc byte ptr cs:[scanline_count+1]
+   inc word ptr cs:[scanline_count+1]
 
 skip_inc1a:
    cmp dl, 19    ; r = pad main loop with additional 4 cycles

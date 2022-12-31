@@ -528,6 +528,11 @@ rasterlines sets the size of a scanline to 19 lchars. Once again we have to
 compensate for the extra scanlines being used up in this region by adding
 6 in this case to the vertical total adjust.
 
+The program HTOT3.ASM sets the width of the screen to 57 lchars and for two
+rasterlines sets the size of a scanline to 38 lchars. There's now just one
+additional scanline over the normal vertical adjust that we need to add to
+compensate.
+
 \subsection{When does htotal take effect?}
 
 Without exception it seems that htotal can be written up to 18 hdots before the
@@ -543,9 +548,9 @@ wraparound. This very likely results in loss of sync.
 
 \subsection{Is there any anomalous behaviour?}
 
-If one sets htotal to a smaller value than hdisp for the last scanline of the
-frame, the address will not be reset to the start address at the beginning of
-the next frame. This causes the address to keep incrementing through VRAM even
+If one sets htotal to a smaller value than hdisp for the last scanline, the
+address will not be reset to the start address for the beginning of the next
+frame. This causes the address to keep incrementing through VRAM even
 as we go from frame to frame.
 
 \subsection{What is triggered by the comparator going high?}

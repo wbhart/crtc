@@ -30,7 +30,7 @@
                    press keys for incrementing by 4 for larger jumps
 
 28-Dec-2022:
-   hordisp - code for experimenting with changing the hdisp. reg.
+   hdisp1 -  code for experimenting with changing the hdisp. reg.
              the code changes the hdisp reg. from an initial value to another
              value and then back again later in the frame
              the exact position of the write is shown by a red bar which starts
