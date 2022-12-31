@@ -70,3 +70,11 @@
    htot3 -   as for htot1 except that the display is set up initially with
              htotal+1 = 56+1 and for 2 rasterlines is set to 37+1
 
+   addr1 -   code for splitting the screen into two CRTC frames and changing
+             the start address back and forth between the two
+             controls are as for hdisp1 except that t/o control the start
+             address low byte
+
+   addr2 -   as for addr1 except that hdisp is set to a value greater than htot
+             in the first of the two CRTC frames
+

@@ -16,8 +16,8 @@
 
    .CODE
 
-   HORDISP_MAX EQU 0   ; hdisp initial value
-   HORDISP_MIN EQU 0   ; what hdisp is set to
+   HORDISP_MAX EQU 0   ; start addr low initial value
+   HORDISP_MIN EQU 1   ; what addr low is set to
 
    BIGDELAY    EQU 216 ; big delay used in main loop (x4 for cycles)
                        ; this can be reduced if there aren't enough
@@ -311,16 +311,16 @@ waste_time:
    mov ax, 2d02h   ; horiz. sync pos. = 45
    out dx, ax
    
-   mov ax, 7f04h   ; vert. total = 127(+1)
+   mov ax, 3f04h   ; vert. total = 63(+1)
    out dx, ax
 
-   mov ax, 0605h   ; vert. total adj. = 6
+   mov ax, 0305h   ; vert. total adj. = 3
    out dx, ax
 
-   mov ax, 6406h   ; vert. disp. = 100
+   mov ax, 2206h   ; vert. disp. = 34
    out dx, ax
 
-   mov ax, 7007h   ; vert. sync pos. = 112
+   mov ax, 2e07h   ; vert. sync pos. = 46
    out dx, ax
 
    mov ax, 0109h   ; max. scanline addr. = 1 (2 scanlines per char)
@@ -335,7 +335,7 @@ waste_time:
    call _refresh
 
 scanline_count:
-   mov bx, 12
+   mov bx, 9
 scanline_loop:
    mov cl, 66
    shl ax, cl
@@ -363,6 +363,20 @@ patchd:
    mov al, 08h
    out dx, al
 
+   mov dl, 0d4h
+   mov al, 07h
+   out dx, al
+   mov dl, 0d5h
+   mov al, 07fh
+   out dx, al
+
+   mov dl, 0d4h
+   mov al, 01h
+   out dx, al
+   mov dl, 0d5h
+   mov al, 039h
+   out dx, al
+
    mov cl, BIGDELAY
 
    call _refresh
@@ -373,15 +387,15 @@ patchd:
 
    call _refresh
 
-   rept 10
+   rept 9
    shl ax, cl
    endm
 
 patch3:
-   mov cl, 20
+   mov cl, 201
    shl ax, cl
 patch1:
-   mov al, 0e0h
+   mov al, 0f8h
    mul al
 
 patche:
@@ -393,6 +407,20 @@ patchg:
    mov dl, 0d9h
 patchh:
    mov al, 08h
+   out dx, al
+
+   mov dl, 0d4h
+   mov al, 07h
+   out dx, al
+   mov dl, 0d5h
+   mov al, 02eh
+   out dx, al
+
+   mov dl, 0d4h
+   mov al, 01h
+   out dx, al
+   mov dl, 0d5h
+   mov al, 028h
    out dx, al
 
    mov al, 0ah
@@ -413,9 +441,14 @@ no_key:
 
    call _refresh
 
-   rept 10
+   rept 9
    shl ax, cl
    endm
+
+   mov cl, 178
+   shl ax, cl
+   mov al, 0f8h
+   mul al
 
    jmp key_loop
 
@@ -466,7 +499,7 @@ patch2_noinc4:
    mov al, 080h
    nop
 patch2:
-   mov cl, 2
+   mov cl, 4
    sar al, cl
    mov byte ptr cs:[patch1+1], al
 skip_inc1:
@@ -546,7 +579,7 @@ visual:
    mov al, 0d5h
    mov byte ptr cs:[patchc+1], al
    mov byte ptr cs:[patchg+1], al
-   mov al, 01h
+   mov al, 0dh
    mov byte ptr cs:[patchb+1], al
    mov byte ptr cs:[patchf+1], al
 lochar:

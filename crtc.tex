@@ -564,4 +564,106 @@ It's unknown whether the horizontal sync counter could be reset at this time.
 Precisely when these events happen hasn't been determined, and we don't know
 if they occur when the comparator for htotal goes high or low.
 
+\section{Start address register}
+
+This controls the address that the CRTC is reset to before the new frame is
+drawn. In the CGA card, each increment of the start address corresponds to
+an increment of two bytes of VRAM (one character).
+
+As we've already begun to speculate about when the start of scanline address
+is reset to the start address, it seemed worthwhile figuring out when this
+happens.
+
+The questions we'd like to answer are as follows:
+
+\begin{enumerate}
+\item Can the start address be written anywhere in the frame?
+\item For which frame does the new start address take effect?
+\item Precisely where does the start address need to be written by?
+\item What likely triggers the start of scanline address to be reset to the start address?
+\end{enumerate}
+
+\subsection{Methodology}
+
+The file ADDR1.ASM divides the CRT frame up into two CRTC frames in the
+vertical direction, each exactly half of the CRT frame in size.
+
+The start address is changed twice per CRT frame, exactly half a CRT frame
+apart, i.e. in exactly the same place on the two CRTC frames.
+
+As well as changing the start address we also follow that up by a change of
+the vertical sync position. In the top CRTC frame the vertical sync position
+is changed to a value that is never reached so that there is no vertical sync
+associated with this frame. This ensures that the only vertical sync is the
+one that happens in the bottom CRTC frame.
+
+The file ADDR2.ASM does the same as ADD1.ASM except that after changing the
+start address and vertical sync position it then immediately changes hdisp.
+In the top CRTC frame it is changed to be greater than htotal and in the
+bottom CRTC frame it is changed back to a normal value.
+
+This allows us to check which scanlines the reset to start address occurs.
+If it were set on more than just the final scanline of the CRTC frame then
+we'd see the start address resetting despite the invalid hdisp never being
+reached on the final scanline of the frame.
+
+Beware that if the register write position is moved more than half way down
+the CRT frame, the vertical sync will end up occurring on what was previously
+the top CRTC frame causing the monitor to briefly lose sync and readjust with
+the two frames switched.
+
+\subsection{Can the start address be written anywhere in the frame?}
+
+It appears that it can be written anywhere in the frame.
+
+\subsection{For which frame does the new start address take effect?}
+
+The start address takes effect for the next frame to start, roughly speaking.
+The precise details are given in the next section.
+
+\subsection{Precisely where does the start address need to be written by?}
+
+The start address needs to be written strictly before the second last hdot
+before hdisp is reached on the scanline before the relevant frame starts.
+
+This confirms what we saw previously, that if hdisp is not reached on the
+final scanline of a frame, the start of scanline address is not reset to the
+start address at the beginning of the next frame.
+
+\subsection{What likely triggers the start of scanline address to be reset to
+the start address?}
+
+Based on the information in the previous section it is extremely likely that
+the hdisp comparator going high on the final scanline of the CRTC frame is
+what causes the start of scanline address to be reset to the start address.
+
+When we say ``final scanline of the CRTC frame'' we are not referring to the
+active region, but the entire frame.
+
+This is mildly surprising because it's not immediately clear how the CRTC
+recognises that it is on the final scanline of the frame. If there is a
+vertical adjust period then the final scanline of the frame is certainly
+nothing to do with vtotal.
+
+Also, if vtotal adjust is zero then it cannot simply be waiting until the
+vtotal adjust counter reaches the value in the vtotal adjust register, as that
+value will be zero for most of the frame.
+
+One possibility is that a value of zero in this register causes problems, but
+there is no mention of this in the documentation.
+
+As the vertical displayed value must be less than the total number of vertical
+characters it might simply be that the start of scanline address is reset
+when hdisp is reached on \emph{every} scanline once vtotal is reached. Then
+so long as the start address is set before the last time this happens, all
+will be well.
+
+However, tests with our second program in this section confirm this is not the
+case. The reset to start address occurs only on the final scanline of the CRTC
+frame and only if and when hdisp is reached on that scanline.
+
+Some fairly complex condition must indicate that the final scanline of the
+frame has been reached. Hopefully this will be revealed when we study the
+vertical adjust register.
+
 \end{document}

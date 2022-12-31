@@ -17,7 +17,7 @@
    .CODE
 
    HORDISP_MAX EQU 40  ; starting value of horiz. disp. reg.
-   HORDISP_MIN EQU 0   ; what horiz. disp. is set to initially
+   HORDISP_MIN EQU 0   ; what horiz. disp. is set to first time
    HORDISP2    EQU 0   ; what horiz. disp. is set to second time
    BIGDELAY    EQU 216 ; big delay used in main loop (x4 cycles)
 
