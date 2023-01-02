@@ -265,7 +265,7 @@ This controls the number of characters that are displayed horizontally on each
 scanline, but many questions remain.
 
 \begin{enumerate}
-\item Precisely when does it take effect?
+\item When does the hdisp register value take effect?
 \item Is there any edge case behaviour?
 \item What resets the count to zero?
 \item What triggers when the comparator goes high/low?
@@ -354,7 +354,7 @@ CRTC has stopped updating the VRAM address at the end of each scanline.
 Counting is done on a large LCD monitor after conversion using an RGB2HDMI
 adaptor, which makes every hdot visible.
 
-\subsection{When does the horiz. disp. reg. value take effect?}
+\subsection{When does the hdisp register value take effect?}
 
 For a to-imminent change from a higher hdisp value we see three behaviours:
 
@@ -665,5 +665,126 @@ frame and only if and when hdisp is reached on that scanline.
 Some fairly complex condition must indicate that the final scanline of the
 frame has been reached. Hopefully this will be revealed when we study the
 vertical adjust register.
+
+\section{Horizontal sync}
+
+There are two registers associated with horizontal sync: the horizontal sync
+position and the horizontal sync length registers.
+
+The first of these registers sets the position that the horizontal sync pulse
+will be emitted, along with a blank region whose number of characters is given
+by the second register.
+
+We'd like to find out the following about the horizontal sync.
+
+\begin{itemize}
+\item What position does the horizontal blanking region appear?
+\item When does the hsync register have to be set?
+\item Is there any marginal behaviour of hsync?
+\item Can more than one sync region appear on the same scanline?
+\item What resets the hsync counter?
+\item Are any things triggered by the hsync counter?
+\end{itemize}
+
+\subsection{Methodology}
+
+To make things a little easier to see on the screen, we increased the
+standard value of the horizontal sync length by two characters and decreased
+the horizontal sync position by two characters.
+
+The program HSYNC1.ASM sets the horizontal sync position temporarily to a
+specified value, then precisely one scanline later sets it back to the the
+value mentioned above. Immediately after setting it back, it also sets the
+hsync width to a specified value which by default is the value mentioned above,
+but can be decremented at will.
+
+The program HSYNC2.ASM is as per HSYNC1.ASM except that instead of returning
+the hsync position back to its initial value one scanline later, it does it
+on the same scanline. This will allow us to see if the hsync can fire twice in
+the same scanline.
+
+\subsection{What position does the horizontal blanking region appear?}
+
+Interestingly, the horizontal blanking begins one hchar before the position
+corresponding to the hsync value is reached. It's not that the machine travels
+back in time, but obviously there are some delays in the CGA card, e.g. to
+retrieve graphics information from memory, propagation delays, delays to
+prevent simultaneous access of the CPU and CGA card to VRAM, etc. This means
+that the background colour changes and the display of pixels from graphics
+memory actually happens later than signals on the pins of the CRTC might
+suggest.
+
+Horizontal blanking actually continues across scanlines. In fact, one can set
+any value up to and including htotal as the hsync position. If it is set higher
+than that it will not be reached on a scanline.
+
+\subsection{When does the hsync register have to be set?}
+
+The hsync position must be set strictly more than 2 hdots before the position
+in question. However, extra time is required if it is already about to initiate
+a horizontal sync at the next character.
+
+If one is pending, it will commit to this 8 hdots earlier than the cutoff just
+mentioned, i.e. a total of 10 hdots before the pending character and one would
+need to set the register before it commits itself in order to ensure the
+upcoming hsync doesn't happen.
+
+We speculate that the CRTC clock goes high for the 8 hdots between the two
+points and that the comparator going high at any time during this 8 hdots flips
+an internal flip-flop to say that hsync must occur at the next character.
+
+Thus if the next character matches the position already in the register at the
+start of those 8 hdots it is committed to an hsync regardless of any changes to
+the register value. If the comparator isn't already high, any change of the
+register to a value matching the next character during that 8 hdot period will
+send the comparator high and likewise commit it to an hsync.
+
+In addition to this, the hsync pos register seems to exhibit the same timing
+delay of 1 hdot if a from-imminent change to a higher value with at least the
+same 1 bits set is made. This is not surprising, as the same register and
+comparator circuitry is probably used, though this is a smaller register than
+the hdisp case, so it wouldn't have been inconceivable that the same delay not
+be observed here.
+
+\subsection{Is there any marginal behaviour of hsync?}
+
+In fact, if one sets the hsync pos precisely three hdots before the specified
+character, the CRTC will start blanking one hchar late. Thus an extra hchar
+will be displayed than would otherwise be the case.
+
+\subsection{Can more than one sync region appear on the same scanline?}
+
+It appears that the horizontal sync blanking can happen more than once on a
+scanline. So long as the hsync pos. value is reached multiple times, the
+horizontal sync counter will begin multiple times and there will be multiple
+blanking intervals on the scanline.
+
+\subsection{What resets the hsync counter?}
+
+We can infer from the previous section that the hsync counter resets itself
+when it reaches its terminal count. This enables the hsync to fire multiple
+times on a scanline.
+
+\subsection{Are any things triggered by the hsync counter?}
+
+It's is difficult to say with any certainty what if anything is triggered by
+the hsync counter.
+
+One might assume something is trigger by it because vertical sync is lost
+if one sets the horizontal sync so that it doesn't finish before the end of
+the final scanline before the vertical blanking period.
+
+It's not entirely obvious what's going on here as one would expect hsync to
+not be reached and for the vertical sync pulse to be unaffected.
+
+According to Reenigne the CGA card rather than the CRTC delays a vsync pulse
+until the next hsync pulse occurs. This means there is a delay that wouldn't
+otherwise exist meaning the next frame starts one scanline late.
+
+This doesn't completely explain the phenomenon as the delay to the start of
+the next frame means that the program will effectively be doing the hsync pos
+register write one scanline earlier on the next frame, which should no longer
+be a problem. However a continuous slow loss of vertical sync is observed in
+practice. This remains unexplained.
 
 \end{document}
