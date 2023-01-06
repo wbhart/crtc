@@ -1,3 +1,3 @@
-hsync1.exe: hsync1.asm
-	tasm hsync1
-	tlink hsync1
+vdisp1.exe: vdisp1.asm
+	tasm vdisp1
+	tlink vdisp1

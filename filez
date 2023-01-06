@@ -78,3 +78,11 @@
    addr2 -   as for addr1 except that hdisp is set to a value greater than htot
              in the first of the two CRTC frames
 
+06-Jan-2023:
+   vdisp1 -  As for hdisp1 except that vdisp is changed from HORDISP_MAX as the
+             frame starts, to HORDISP_MIN (and then back to HORDISP_MAX before
+             the frame begins again (in practice about 32 scanlines after the
+             first change). The keys are the same as usual. Obviously t/o
+             control these two vdisp values (t controls the value the frame
+             starts with).
+

@@ -356,7 +356,8 @@ adaptor, which makes every hdot visible.
 
 \subsection{When does the hdisp register value take effect?}
 
-For a to-imminent change from a higher hdisp value we see three behaviours:
+For a to-imminent change from a higher hdisp value we see three behaviours on
+the IBM card:
 
 \begin{enumerate}
 \item The new hdisp value ($n$) takes full effect, blanking all but the
@@ -370,8 +371,15 @@ of the final character which only displays the first hchar of the full lchar,
 the right hand hchar being blank
 \end{enumerate}
 
-These behaviours occur when the write happens on the fourth last, third last or
-second last hdot before the imminent character, respectively.
+Note that the second behaviour doesn't occur on other full length CGA cards
+with the HD6845 chip and in the case of the third behaviour those cards blank
+the entire final lchar, This leads us to speculate that in the case of the IBM
+card, the marginal behaviour is because the CRTC is simply changing the logic
+levels on its blanking pin a little too late for circuitry in the IBM card.
+
+On the IBM card, the three behaviours above occur when the write happens on the
+fourth last, third last or second last hdot before the imminent character,
+respectively.
 
 A to-imminent change to a strictly greater value has no visible effect on the
 current scanline, as we are already blanking at that point, so it continues to
@@ -419,10 +427,8 @@ but it has been very carefully measured.
 \subsection{Is there any edge case behaviour?}
 
 If hdisp is set strictly greater than htotal the final character of the
-scanline is only half displayed; the second hchar of that final lchar is blank.
-
-This is probably a general behaviour of this CRTC (the final hchar before
-the end of the scanline is blanked).
+scanline is only half displayed; the second hchar of that final lchar is blank,
+at least on the IBM CGA card.
 
 \subsection{What resets the count to zero?}
 
@@ -786,5 +792,161 @@ the next frame means that the program will effectively be doing the hsync pos
 register write one scanline earlier on the next frame, which should no longer
 be a problem. However a continuous slow loss of vertical sync is observed in
 practice. This remains unexplained.
+
+\section{The Vertical Displayed Register}
+
+This controls how many character rows are displayed. In graphics mode we
+usually set things up so that there are two scanlines per character row.
+The row address within the character is use by the CGA card to switch banks
+so that even row accesses are from B800-B9FF and odd row accesses are from
+BA00-BBFF.
+
+There are a few things we'd like to know about the vertical displayed
+register.
+
+\begin{itemize}
+\item When does vdisp have to be set to take effect?
+\item What happens if vdisp is set larger than vtotal?
+\item Can vdisp be set multiple times per frame?
+\item What resets the row counter?
+\item What does vdisp being reached trigger?
+\item Is there any marginal behaviour of vdisp?
+\end{itemize}
+
+\subsection{Methodology}
+
+The program VDISP1.ASM allows vdisp to be set twice a frame to two different
+values. They two values are set at precisely the same point on their respective
+scanlines.
+
+The usual mode of operation would be for vdisp to be set to a single value for
+all frames, which can be simulated by setting the value to the same thing
+twice in the frame. However, we also want to do experiments where the value is
+set multiple times per frame.
+
+\subsection{When does vdisp have to be set to take effect?}
+
+In order to determine this, vdisp has to be set to one value as the frame
+starts and changed to another value during the frame (then back to the
+original value before the next frame).
+
+As usual we'll distinguish from-imminent and to-imminent changes.
+
+We begin with a to-imminent change from a higher value that was in vdisp at
+the beginning of the frame.
+
+On the IBM CGA card behaviour is expected except on two and sometimes one
+character row. One of these rows is the character row of the to-imminent
+value. Instead of the register being written too late so that the larger
+number of character rows is displayed, some marginal behaviour occurs.
+
+The other character row where marginal behaviour is displayed is a row that
+is most of the time some power of two rows below the to-imminent one. The
+exact row depends on the values vdisp is being changed from and to and the
+row that the change is made, amongst other things we have not determined
+(possibly manufacturing tolerances, CRTC revision, temperature, etc.) In
+very rare cases the behaviour was not even stable, flickering from frame to
+frame.
+
+We won't characterise the latter behaviour fully, as it appears to not occur
+on other full length CGA cards with the same chip.
+
+Moreover, in the former case, only the last scanline of the character row in
+question is affected on other CGA cards. For this reason we will only
+characterise the behaviour on the IBM card for this scanline. However, even
+then it should be noted that other graphics cards seem to display full lchars
+and no hchars are observed.
+
+So, on the IBM card for the final scanline of the character row corresponding
+to the to-imminent value the following is observed. At 3 hdots before the start
+of the scanline the to-imminent number of character rows is displayed, plus an
+additional scanline (this may depend on the number of scanlines per row) and
+one additional hchar on the final scanline of the row. Then 2 hdots before the
+start of the scanline a full lchar is displayed on this scanline instead of an
+hchar.
+
+This pattern is then repeated across the scanline every 16 hdots, gradually
+filling in the scanline one hchar at a time.
+
+For what it is worth, on the IBM card, this same behaviour occurs on the
+previous scanline as well (possibly on all scanlines of the extra character
+row if there are more than two).
+
+So far we have not had access to another IBM CGA card with the same chip to
+verify that the behaviour is replicated across cards. However, this glitch
+seems to be more of a bug than an exploitable feature.
+
+Given that the appearance of extra hchars only occurs on IBM CGA cards with
+this specific CRTC, it's not a broadly applicable trick. It's not known whether
+this occurs on any other system, let alone on another PC card. However,
+blanking of the final character of the scanline is reported for this CRTC on
+other systems.
+
+It may even be the case that on systems that do blanking on a per-pixel basis
+that even more fine control is available than down to the hchar. But alas,
+there is no such per-pixel blanking on the IBM CGA.
+
+For a to-imminent change from a lower value at the beginning of the frame, no
+unusual behaviour is observed. The CRTC is already blanking at the lower
+character row and continues to do so at the higher one.
+
+\subsection{What happens if vdisp is set larger than vtotal?}
+
+In order to check this, vtotal has to be less than 127 as vdisp and vtotal are
+only 7 bit registers, so it is not possible to set vdisp higher than 127.
+
+To enable this, we set vtotal to 126 and simply increased vertical total adjust
+by 2.
+
+No unusual behaviour was noted. The entire frame is filled as normal.
+
+Similarly if vtotal is set to 125 and vdisp is set higher than this, no unusual
+behaviour is noted.
+
+\subsection{Can vdisp be set multiple times per frame?}
+
+No unusual behaviour was observed if vdisp was set multiple times in a frame.
+This includes the case where one of those times is to a value larger than
+vtotal.
+
+Of course once the active region ends for the first time it is not reactivated
+again in the same frame.
+
+\subsection{What resets the character row counter?}
+
+At this point it is unknown what resets the character row counter. Almost
+certainly there is only one character row counter against which both vdisp and
+vtotal are compared, and the counter is needed for comparison against vtotal,
+so it stands to reason that vdisp has no bearing on when the row counter is
+reset.
+
+\subsection{What does vdisp being reached trigger?}
+
+Other than blanking it is not known if anything else is triggered.
+
+Logically there may be nothing else triggered. We've already established that
+reset to start address happens on the final scanline of the frame. Clearly
+vtotal is independent of vdisp. Vertical sync can clearly happen before vdisp
+is reached. It is logical that vertical total adjust triggers from vtotal. So
+there isn't anything else that seems like it should depend on vdisp being
+reached.
+
+\subsection{Is there any marginal behaviour of vdisp?}
+
+If the frame starts with vdisp set to zero and the register is then changed to
+some reasonable value on any scanline except the first, then some very unusual
+behaviour results.
+
+The first scanline is painted with alternating filled hchars and blank hchars,
+except for the first lchar which is entirely blank.
+
+Reenigne suggests that it is trying to set active and inactive at the same
+time, one on every rising edge of the clock pulse and the other on every
+trailing edge.
+
+If the value of vdisp is instead changed from 0 on the first scanline of the
+frame then the same pattern results up to the point where the value is set, and
+from then on the scanlines are displayed normally as would be expected from the
+value that is set.
 
 \end{document}
